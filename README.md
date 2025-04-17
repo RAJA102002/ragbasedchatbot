@@ -5,7 +5,7 @@ A Retrieval-Augmented Generation (RAG) chatbot built with Streamlit and open-sou
 ## Features
 - Retrieval-Augmented Generation (RAG) for context-aware responses.
 - DeepSeek R1 as the LLM for generating answers.
-- ChromaDB** as the vector store for efficient document retrieval.
+- ChromaDB as the vector store for efficient document retrieval.
 - Nomic Embed Text for embedding knowledge into a searchable format.
 - Streamlit UI for easy interaction with the AI chatbot.
 
