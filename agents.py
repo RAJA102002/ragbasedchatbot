@@ -1,7 +1,4 @@
-import sys
-import os
-sys.path.append(os.path.abspath("path/to/folder/containing/praisonaiagents"))
-
+import streamlit as st
 from praisonaiagents import Agent
 
 def init_agent():
