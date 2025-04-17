@@ -1,40 +1,63 @@
+import streamlit as st
 from praisonaiagents import Agent
 
-config = {
-    "vector_store": {
-        "provider": "chroma",
-        "config": {
-            "collection_name": "custom_knowledge",
-            "path": ".praison",
-        }
-    },
-    "llm": {
-        "provider": "ollama",
-        "config": {
-            "model": "deepseek-r1:latest",
-            "temperature": 0,
-            "max_tokens": 8000,
-            "ollama_base_url": "http://localhost:11434",
-        }
-    },
-    "embedder": {
-        "provider": "ollama",
-        "config": {
-            "model": "nomic-embed-text:latest",
-            "ollama_base_url": "http://localhost:11434",
-            "embedding_dims": 1536
+def init_agent():
+    config = {
+        "vector_store": {
+            "provider": "chroma",
+            "config": {
+                "collection_name": "custom_knowledge",
+                "path": ".praison"
+            }
+        },
+        "llm": {
+            "provider": "ollama",
+            "config": {
+                "model": "deepseek-r1:latest",
+                "temperature": 0,
+                "max_tokens": 8000,
+                "ollama_base_url": "http://localhost:11434",
+            }
+        },
+        "embedder": {
+            "provider": "ollama",
+            "config": {
+                "model": "nomic-embed-text:latest",
+                "ollama_base_url": "http://localhost:11434",
+                "embedding_dims": 1536
+            }
         }
     }
-}
 
+    return Agent(
+        name="Knowledge Agent",
+        instructions="You answer questions based on the provided knowledge.",
+        knowledge=["nature.pdf"],
+        knowledge_config=config,
+        user_id="user1",
+        llm="deepseek-r1"
+    )
 
-agent = Agent(
-    name="Knowledge Agent",
-    instructions="You answer questions based on the provided knowledge.",
-    knowledge=["nature.pdf"], #indexing
-    knowledge_config=config,
-    user_id="user1",
-    llm="deepseek-r1",
-)
+st.title("Knowledge Agent Chat")
 
-agent.start("What is Prod URL and Staging URL?") #Retrieval
+if "agent" not in st.session_state:
+    st.session_state.agent = init_agent()
+    st.session_state.messages = []
+
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
+
+prompt = st.chat_input("Ask a question...")
+
+if prompt:
+    st.session_state.messages.append({"role": "user", "content": prompt})
+    with st.chat_message("user"):
+        st.markdown(prompt)
+
+    with st.chat_message("assistant"):
+        with st.spinner("Thinking..."):
+            response = st.session_state.agent.start(prompt)
+        st.markdown(response)
+        st.session_state.messages.append({"role": "assistant", "content": response})
+
