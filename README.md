@@ -29,7 +29,7 @@ Could you make sure you have Python 3.8+ installed?
 - Install Python
 - Install Ollama
 
-## Start Ollama (Locally) and other Dependencies**
+## Start Ollama (Locally) and other Dependencies
 Ensure you have Ollama installed and running:
 ```bash
 #Install Ollama
