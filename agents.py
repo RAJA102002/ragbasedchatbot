@@ -1,53 +1,83 @@
 import streamlit as st
-from praisonaiagents import Agent
+import chromadb
+from chromadb.utils import embedding_functions
+import requests
+import os
+from PyPDF2 import PdfReader
 
-def init_agent():
-    config = {
-        "vector_store": {
-            "provider": "chroma",
-            "config": {
-                "collection_name": "praison",
-                "path": ".praison"
-            }
-        },
-        "llm": {
-            "provider": "ollama",
-            "config": {
-                "model": "deepseek-r1:latest",
-                "temperature": 0,
-                "max_tokens": 8000,
-                "ollama_base_url": "http://localhost:11434",
-            },
-        },
-        "embedder": {
-            "provider": "ollama",
-            "config": {
-                "model": "nomic-embed-text:latest",
-                "ollama_base_url": "http://localhost:11434",
-                "embedding_dims": 1536
-            },
-        },
-    }
-    
-    return Agent(
-        name="Knowledge Agent",
-        instructions="You answer questions based on the provided knowledge.",
-        knowledge=["nature.pdf"],
-        knowledge_config=config,
-        user_id="user1",
-        llm="deepseek-r1"
+OLLAMA_URL = "http://localhost:11434"
+LLM_MODEL = "deepseek-r1:latest"
+EMBED_MODEL = "nomic-embed-text:latest"
+COLLECTION_NAME = "praison"
+CHROMA_PATH = ".praison"
+PDF_FILE = "nature.pdf"
+
+
+def ollama_embed(texts):
+    embeddings = []
+    for text in texts:
+        response = requests.post(
+            f"{OLLAMA_URL}/api/embeddings",
+            json={"model": EMBED_MODEL, "prompt": text}
+        )
+        embeddings.append(response.json()["embedding"])
+    return embeddings
+
+def load_pdf_chunks(pdf_path, chunk_size=300):
+    reader = PdfReader(pdf_path)
+    full_text = ""
+    for page in reader.pages:
+        full_text += page.extract_text() + "\n"
+    chunks = [full_text[i:i+chunk_size] for i in range(0, len(full_text), chunk_size)]
+    return chunks
+
+def init_vector_store():
+    client = chromadb.PersistentClient(path=CHROMA_PATH)
+    collection = client.get_or_create_collection(name=COLLECTION_NAME)
+
+    if len(collection.get()["ids"]) == 0:  
+        chunks = load_pdf_chunks(PDF_FILE)
+        embeddings = ollama_embed(chunks)
+        ids = [f"doc_{i}" for i in range(len(chunks))]
+        collection.add(documents=chunks, embeddings=embeddings, ids=ids)
+
+    return collection
+
+def retrieve_relevant_chunks(query, collection, top_k=4):
+    query_embed = ollama_embed([query])[0]
+    results = collection.query(query_embeddings=[query_embed], n_results=top_k)
+    return results["documents"][0]
+
+def call_ollama(prompt):
+    response = requests.post(
+        f"{OLLAMA_URL}/api/generate",
+        json={"model": LLM_MODEL, "prompt": prompt}
     )
+    return response.json().get("response", "No response.")
+
+def ask_agent(user_input, collection):
+    chunks = retrieve_relevant_chunks(user_input, collection)
+    context = "\n\n".join(chunks)
+    full_prompt = f"""You are a helpful AI answering based on the context below.
+
+Context:
+{context}
+
+Question: {user_input}
+Answer:"""
+    return call_ollama(full_prompt)
+
 
 st.title("Knowledge Agent Chat")
 
-if "agent" not in st.session_state:
-    st.session_state.agent = init_agent()
-    st.session_state.messages = []
+if "collection" not in st.session_state:
+    with st.spinner("Initializing..."):
+        st.session_state.collection = init_vector_store()
+        st.session_state.messages = []
 
-if "messages" in st.session_state:
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
 
 prompt = st.chat_input("Ask a question...")
 
@@ -57,6 +87,7 @@ if prompt:
         st.markdown(prompt)
 
     with st.chat_message("assistant"):
-        response = st.session_state.agent.start(prompt)
+        with st.spinner("Thinking..."):
+            response = ask_agent(prompt, st.session_state.collection)
         st.markdown(response)
-        st.session_state.messages.append({"role": "assistant", "content": response}) 
+        st.session_state.messages.append({"role": "assistant", "content": response})
