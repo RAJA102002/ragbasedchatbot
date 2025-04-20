@@ -37,17 +37,20 @@ Ensure you have Ollama installed and running:
 
 Download DeepSeek R1:
 ```bash
-ollama pull deepseek-r1:latest
+ollama pull deepseek-llm:latest
+
 ```
 
 Download Nomic Embed models:
 ```bash
 ollama pull nomic-embed-text:latest
+
 ```
 
 Install required packages:
 ```bash
-pip install "praisonaiagents[knowledge]" ollama streamlit
+pip install chromadb
+
 ```
 
 Now, set your OpenAI API key, to the requirement for the SDK:
